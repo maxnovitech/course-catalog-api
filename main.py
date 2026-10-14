@@ -1,18 +1,23 @@
+import os
 from typing import Literal, Annotated, Optional
 from fastapi import FastAPI, HTTPException, Depends, Query
-from data import find_course, get_all_courses
-from models import Course, Stats
-
 from fastapi.middleware.cors import CORSMiddleware
+from data import find_course, get_all_courses
+from models import Course, Stats, Enrollment, EnrollmentIn
 
 app = FastAPI(title="Course Catalog API")
 
+# Bonus Task 3: configurable CORS origins via environment variable with fallback
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+ENROLLMENTS: list[Enrollment] = []
 
 @app.get("/")
 def read_root():
@@ -23,7 +28,6 @@ def pagination(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20
 ):
     return {"offset": (page - 1) * page_size, "limit": page_size}
-
 
 @app.get("/courses", response_model=list[Course])
 def list_courses(
@@ -53,6 +57,31 @@ def get_course(course_id: str):
     if course is None:
         raise HTTPException(status_code=404, detail="Course not found")
     return course
+
+@app.post("/courses/{course_id}/like", response_model=Course)
+def like_course(course_id: str):
+    course = find_course(course_id)
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+    course.likes += 1
+    return course
+
+@app.post("/enrollments", response_model=Enrollment, status_code=201)
+def create_enrollment(data: EnrollmentIn):
+    course = find_course(data.course_id)
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+    enrollment = Enrollment(
+        id=len(ENROLLMENTS) + 1,
+        course_id=data.course_id,
+        student_name=data.student_name,
+    )
+    ENROLLMENTS.append(enrollment)
+    return enrollment
+
+@app.get("/enrollments", response_model=list[Enrollment])
+def list_enrollments():
+    return ENROLLMENTS
 
 @app.get("/stats", response_model=Stats)
 def get_stats():

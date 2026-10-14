@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 class CamelModel(BaseModel):
@@ -20,3 +20,10 @@ class Stats(CamelModel):
     total: int
     total_credits: int
     electives: int
+
+class EnrollmentIn(CamelModel):
+    course_id: str
+    student_name: str = Field(min_length=2)
+
+class Enrollment(EnrollmentIn):
+    id: int
