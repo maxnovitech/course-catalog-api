@@ -7,14 +7,19 @@ from models import Course, Stats, Enrollment, EnrollmentIn
 
 app = FastAPI(title="Course Catalog API")
 
-# Bonus Task 3: configurable CORS origins via environment variable with fallback
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# Bonus Task 3: The origin list from an environment variable (fallback to localhost:3000)
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 
+# Bonus Task 5: Explicit lists instead of asterisks for least privilege security
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 ENROLLMENTS: list[Enrollment] = []

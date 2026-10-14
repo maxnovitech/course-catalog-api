@@ -1,6 +1,6 @@
+import os
 from fastapi.testclient import TestClient
 from main import app, ENROLLMENTS
-from data import COURSES
 
 client = TestClient(app)
 
@@ -20,13 +20,37 @@ def test_cors_headers():
     foreign = client.get("/", headers={"Origin": "http://evil.example"})
     assert "access-control-allow-origin" not in foreign.headers
 
+def test_cors_preflight_and_explicit_lists():
+    # Bonus 5: explicit method POST allowed, DELETE rejected with 400
+    res_opt = client.options(
+        "/enrollments",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res_opt.status_code == 200
+    assert res_opt.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert "POST" in res_opt.headers.get("access-control-allow-methods", "")
+
+    # DELETE not in explicit list
+    res_del = client.options(
+        "/enrollments",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    assert res_del.status_code == 400
+    assert "Disallowed CORS method" in res_del.text
+
 def test_camel_case_courses():
     response = client.get("/courses")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 6
     first = data[0]
-    # Check camelCase keys
     assert "isElective" in first
     assert "is_elective" not in first
 
@@ -39,7 +63,6 @@ def test_query_param_is_elective():
         assert c["isElective"] is True
 
 def test_like_course():
-    # web-security initial likes in data.py is 21
     res = client.post("/courses/web-security/like")
     assert res.status_code == 200
     assert res.json()["id"] == "web-security"
@@ -54,7 +77,6 @@ def test_like_course():
     assert res_404.json()["detail"] == "Course not found"
 
 def test_enrollment_lifecycle():
-    # Valid enrollment
     res = client.post("/enrollments", json={"courseId": "web-security", "studentName": "Aigerim"})
     assert res.status_code == 201
     data = res.json()
@@ -62,7 +84,6 @@ def test_enrollment_lifecycle():
     assert data["courseId"] == "web-security"
     assert data["studentName"] == "Aigerim"
 
-    # Listing enrollments
     res_list = client.get("/enrollments")
     assert res_list.status_code == 200
     assert len(res_list.json()) == 1
